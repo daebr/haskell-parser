@@ -4,17 +4,16 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: cfd0c6609c73a0896b30c6a0c564c835c10b58bfc7363d97243e5a44ef85dac4
+-- hash: 17c12b45d8adc51cc49373ec08bb93269e63263ef1fcbbc5f24f73645f23ddfd
 
 name:           haskell-parser
 version:        0.1.0.0
-description:    Please see the README on GitHub at <https://github.com/githubuser/haskell-parser#readme>
-homepage:       https://github.com/githubuser/haskell-parser#readme
-bug-reports:    https://github.com/githubuser/haskell-parser/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2020 Author name here
-license:        BSD3
+description:    Please see the README on GitHub at <https://github.com/daebr/haskell-parser#readme>
+homepage:       https://github.com/daebr/haskell-parser#readme
+bug-reports:    https://github.com/daebr/haskell-parser/issues
+author:         Ben Price
+copyright:      2020 Ben Price
+license:        MIT
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
@@ -23,7 +22,7 @@ extra-source-files:
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/haskell-parser
+  location: https://github.com/daebr/haskell-parser
 
 library
   exposed-modules:
@@ -36,18 +35,6 @@ library
       base >=4.7 && <5
   default-language: Haskell2010
 
-executable haskell-parser-exe
-  main-is: Main.hs
-  other-modules:
-      Paths_haskell_parser
-  hs-source-dirs:
-      app
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
-  build-depends:
-      base >=4.7 && <5
-    , haskell-parser
-  default-language: Haskell2010
-
 test-suite haskell-parser-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
@@ -57,6 +44,9 @@ test-suite haskell-parser-test
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      HUnit
+    , base >=4.7 && <5
     , haskell-parser
+    , test-framework
+    , test-framework-hunit
   default-language: Haskell2010
