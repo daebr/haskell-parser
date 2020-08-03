@@ -24,6 +24,8 @@ dependencies:
 
 library:
   source-dirs: src
+  dependencies:
+  - transformers
 
 tests:
   haskell-parser-test:

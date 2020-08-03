@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 17c12b45d8adc51cc49373ec08bb93269e63263ef1fcbbc5f24f73645f23ddfd
+-- hash: 557f98aa64c83576a64cb3f651d0e5bcd4e5214d9f4bac817ef71b74a38ad807
 
 name:           haskell-parser
 version:        0.1.0.0
@@ -26,19 +26,21 @@ source-repository head
 
 library
   exposed-modules:
-      Lib
+      Parsing.Parser
   other-modules:
       Paths_haskell_parser
   hs-source-dirs:
       src
   build-depends:
       base >=4.7 && <5
+    , transformers
   default-language: Haskell2010
 
 test-suite haskell-parser-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      Parsing.ParserTest
       Paths_haskell_parser
   hs-source-dirs:
       test
