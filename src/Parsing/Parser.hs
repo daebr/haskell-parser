@@ -1,6 +1,11 @@
 {-# LANGUAGE LambdaCase #-}
 
-module Parsing.Parser where
+module Parsing.Parser
+    ( Parser
+    , ParseResult
+    , parse
+    , pchar
+    ) where
 
 import Control.Monad.Trans.State.Lazy (StateT(..), runStateT)
 
@@ -13,7 +18,11 @@ lift = StateT
 parse :: Parser a -> String -> ParseResult (a, String)
 parse = runStateT
 
-pchar :: Parser Char
-pchar = lift $ \case
+match :: (Char -> Bool) -> Parser Char
+match f = lift $ \case
     [] -> Left "empty"
-    (x:xs) -> Right (x, xs)
+    (x:xs) | f x -> Right (x, xs)
+           | otherwise -> Left "parse failed"
+
+pchar :: Char -> Parser Char
+pchar = match . (==)

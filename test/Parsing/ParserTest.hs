@@ -12,6 +12,7 @@ suite = TestLabel "Parser" (TestList
 
 pcharTest :: Test
 pcharTest = TestLabel "pchar" (TestList
-    [ TestCase $ assertEqual "non-empty" (Right ('a', "bc")) (parse pchar "abc")
-    , TestCase $ assertBool "empty" $ isLeft (parse pchar "")
+    [ TestCase $ assertEqual "match" (Right ('a', "bc")) (parse (pchar 'a') "abc")
+    , TestCase $ assertBool "not match" $ isLeft (parse (pchar 'b') "abc")
+    , TestCase $ assertBool "empty" $ isLeft (parse (pchar 'a') "")
     ])
