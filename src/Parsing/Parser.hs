@@ -12,6 +12,8 @@ module Parsing.Parser
     , oneOrMore
     , pchar
     , pdigit
+    , pstr
+    , pquotedstr
     ) where
 
 import Data.Char (isDigit)
@@ -68,3 +70,12 @@ pchar = match . (==)
 
 pdigit :: Parser Char
 pdigit = match isDigit
+
+pstr :: String -> Parser String
+pstr = traverse pchar
+
+pquotedstr :: Parser String
+pquotedstr = quote &&. zeroOrMore nonQuote .&& quote
+  where
+    quote = pchar '"'
+    nonQuote = match (/= '"')

@@ -10,6 +10,8 @@ suite :: Test
 suite = TestLabel "Parser" (TestList
     [ pcharTest
     , pdigitTest
+    , pstrTest
+    , pquotedstrTest
     , altTest
     , tupleTest
     , ignoreTest
@@ -29,6 +31,20 @@ pdigitTest :: Test
 pdigitTest = TestLabel "pdigit" (TestList
     [ TestCase $ assertEqual "match" (Right ('1', "")) $ parse pdigit "1"
     , TestCase $ assertBool "not match" $ isLeft (parse pdigit "a")
+    ])
+
+pstrTest :: Test
+pstrTest = TestLabel "pstr" (TestList
+    [ TestCase $ assertEqual "match" (Right ("abc", "")) $ parse (pstr "abc") "abc"
+    , TestCase $ assertBool "no match" $ isLeft (parse (pstr "bc") "abc")
+    , TestCase $ assertBool "part match" $ isLeft (parse (pstr "acb") "abc")
+    ])
+
+pquotedstrTest :: Test
+pquotedstrTest = TestLabel "pquotedstring" (TestList
+    [ TestCase $ assertEqual "success" (Right ("value", "")) $ parse pquotedstr "\"value\""
+    , TestCase $ assertBool "no open quote" $ isLeft (parse pquotedstr "value\"")
+    , TestCase $ assertBool "no close quote" $ isLeft (parse pquotedstr "\"value")
     ])
 
 altTest :: Test
