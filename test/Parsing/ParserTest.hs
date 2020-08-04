@@ -14,6 +14,8 @@ suite = TestLabel "Parser" (TestList
     , tupleTest
     , ignoreTest
     , optionTest
+    , zeroOrMoreTest
+    , oneOrMoreTest
     ])
 
 pcharTest :: Test
@@ -56,4 +58,20 @@ optionTest :: Test
 optionTest = TestLabel "option" (TestList
     [ TestCase $ assertEqual "match" (Right (Just 'a', "bc")) $ parse (option $ pchar 'a') "abc"
     , TestCase $ assertEqual "no match" (Right (Nothing, "abc")) $ parse (option $ pchar 'b') "abc"
+    ])
+
+oneOrMoreTest :: Test
+oneOrMoreTest = TestLabel "oneOrMore" (TestList
+    [ TestCase $ assertBool "empty" $ isLeft (parse (oneOrMore $ pchar 'a') "")
+    , TestCase $ assertBool "none" $ isLeft (parse (oneOrMore $ pchar 'b') "abc")
+    , TestCase $ assertEqual "one" (Right ("a", "bc")) $ parse (oneOrMore $ pchar 'a') "abc"
+    , TestCase $ assertEqual "more" (Right ("aaa", "bc")) $ parse (oneOrMore $ pchar 'a') "aaabc"
+    ])
+
+zeroOrMoreTest :: Test
+zeroOrMoreTest = TestLabel "zeroOrMore" (TestList
+    [ TestCase $ assertEqual "empty" (Right ([], "")) $ parse (zeroOrMore $ pchar 'a') ""
+    , TestCase $ assertEqual "none" (Right ([], "abc")) $ parse (zeroOrMore $ pchar 'b') "abc"
+    , TestCase $ assertEqual "one" (Right ("a", "bc")) $ parse (zeroOrMore $ pchar 'a') "abc"
+    , TestCase $ assertEqual "more" (Right ("aaa", "bc")) $ parse (zeroOrMore $ pchar 'a') "aaabc"
     ])

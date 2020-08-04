@@ -8,6 +8,8 @@ module Parsing.Parser
     , (&&.)
     , parse
     , option
+    , zeroOrMore
+    , oneOrMore
     , pchar
     , pdigit
     ) where
@@ -45,6 +47,12 @@ pa .&& pb = fst <$> pa .&&. pb
 infixl 5 &&.
 (&&.) :: Parser a -> Parser b -> Parser b
 pa &&. pb = snd <$> pa .&&. pb
+
+zeroOrMore :: Parser a -> Parser [a]
+zeroOrMore p = oneOrMore p <|> pure []
+
+oneOrMore :: Parser a -> Parser [a]
+oneOrMore p = (:) <$> p <*> (oneOrMore p <|> pure [])
 
 match :: (Char -> Bool) -> Parser Char
 match f = lift $ \case
