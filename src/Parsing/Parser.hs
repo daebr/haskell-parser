@@ -10,10 +10,14 @@ module Parsing.Parser
     , option
     , zeroOrMore
     , oneOrMore
+    , anyOf
+    , pwhen
     , pchar
     , pdigit
+    , panychar
     , pstr
     , pquotedstr
+    , enclosed
     ) where
 
 import Data.Char (isDigit)
@@ -56,20 +60,37 @@ zeroOrMore p = oneOrMore p <|> pure []
 oneOrMore :: Parser a -> Parser [a]
 oneOrMore p = (:) <$> p <*> (oneOrMore p <|> pure [])
 
+anyOf :: [Parser a] -> Parser a
+anyOf = foldl (<|>) (failWith "anyOf failed")
+
 match :: (Char -> Bool) -> Parser Char
 match f = lift $ \case
     [] -> Left "empty"
     (x:xs) | f x -> Right (x, xs)
            | otherwise -> Left "parse failed"
 
+pwhen :: (a -> Bool) -> Parser a -> Parser a
+pwhen f p = p >>= \a -> if f a
+                        then pure a
+                        else failWith "pwhen failed"
+
 option :: Parser a -> Parser (Maybe a)
 option p = Just <$> p <|> pure Nothing
+
+enclosed :: Parser b -> Parser b -> Parser a -> Parser a
+enclosed pstart pend p = pstart &&. p .&& pend
+
+failWith :: String -> Parser a
+failWith = lift . const . Left
 
 pchar :: Char -> Parser Char
 pchar = match . (==)
 
 pdigit :: Parser Char
 pdigit = match isDigit
+
+panychar :: Parser Char
+panychar = match $ const True
 
 pstr :: String -> Parser String
 pstr = traverse pchar

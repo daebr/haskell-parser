@@ -10,14 +10,18 @@ suite :: Test
 suite = TestLabel "Parser" (TestList
     [ pcharTest
     , pdigitTest
+    , panycharTest
     , pstrTest
     , pquotedstrTest
+    , enclosedTest
     , altTest
     , tupleTest
     , ignoreTest
+    , pwhenTest
     , optionTest
     , zeroOrMoreTest
     , oneOrMoreTest
+    , anyOfTest
     ])
 
 pcharTest :: Test
@@ -33,6 +37,12 @@ pdigitTest = TestLabel "pdigit" (TestList
     , TestCase $ assertBool "not match" $ isLeft (parse pdigit "a")
     ])
 
+panycharTest :: Test
+panycharTest = TestLabel "panychar" (TestList
+    [ TestCase $ assertEqual "exists" (Right ('a', "bc")) $ parse panychar "abc"
+    , TestCase $ assertBool "empty" $ isLeft (parse panychar [])
+    ])
+
 pstrTest :: Test
 pstrTest = TestLabel "pstr" (TestList
     [ TestCase $ assertEqual "match" (Right ("abc", "")) $ parse (pstr "abc") "abc"
@@ -46,6 +56,17 @@ pquotedstrTest = TestLabel "pquotedstring" (TestList
     , TestCase $ assertBool "no open quote" $ isLeft (parse pquotedstr "value\"")
     , TestCase $ assertBool "no close quote" $ isLeft (parse pquotedstr "\"value")
     ])
+
+enclosedTest :: Test
+enclosedTest = TestLabel "enclosed" (TestList
+    [ TestCase $ assertEqual "success" (Right ("value", "")) $ parse (enclosed (pchar '(') (pchar ')') pvalue) "(value)"
+    , TestCase $ assertEqual "success2" (Right ("value", "more<>")) $ parse (enclosed (pchar '<') (pchar '>') pvalue) "<value>more<>"
+    , TestCase $ assertBool "no open" $ isLeft (parse (enclosed (pchar '(') (pchar ')') pvalue) "value)")
+    , TestCase $ assertBool "no close" $ isLeft (parse (enclosed (pchar '(') (pchar ')') pvalue) "(value")
+    ])
+  where
+    pvalue = zeroOrMore (pwhen notEnclosingChar panychar)
+    notEnclosingChar c = and $ (/=) c <$> ['(', ')', '<', '>']
 
 altTest :: Test
 altTest = TestLabel "<|>" (TestList
@@ -70,6 +91,13 @@ ignoreTest = TestLabel "ignore" (TestList
     , TestCase $ assertBool "a .&& !" $ isLeft (parse (pchar 'a' .&& pchar 'c') "abc")
     ])
 
+pwhenTest :: Test
+pwhenTest = TestLabel "pwhen" (TestList
+    [ TestCase $ assertEqual "pwhen true" (Right ('a', "bc")) $ parse (pwhen (== 'a') $ pchar 'a') "abc"
+    , TestCase $ assertBool "pwhen false" $ isLeft (parse (pwhen (== 'b') $ pchar 'a') "abc")
+    , TestCase $ assertBool "pwhen fail" $ isLeft (parse (pwhen (== 'a') $ pchar 'b') "abc")
+    ])
+
 optionTest :: Test
 optionTest = TestLabel "option" (TestList
     [ TestCase $ assertEqual "match" (Right (Just 'a', "bc")) $ parse (option $ pchar 'a') "abc"
@@ -90,4 +118,11 @@ zeroOrMoreTest = TestLabel "zeroOrMore" (TestList
     , TestCase $ assertEqual "none" (Right ([], "abc")) $ parse (zeroOrMore $ pchar 'b') "abc"
     , TestCase $ assertEqual "one" (Right ("a", "bc")) $ parse (zeroOrMore $ pchar 'a') "abc"
     , TestCase $ assertEqual "more" (Right ("aaa", "bc")) $ parse (zeroOrMore $ pchar 'a') "aaabc"
+    ])
+
+anyOfTest :: Test
+anyOfTest = TestLabel "anyOf" (TestList
+    [ TestCase $ assertEqual "match" (Right ('a', "bc")) $ parse (anyOf [pchar 'c', pchar 'b', pchar 'a']) "abc"
+    , TestCase $ assertBool "no match" $ isLeft (parse (anyOf [pchar 'b', pchar 'c']) "abc")
+    , TestCase $ assertBool "empty parsers" $ isLeft (parse (anyOf []) "abc")
     ])
