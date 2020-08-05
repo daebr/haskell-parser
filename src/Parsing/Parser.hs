@@ -3,6 +3,7 @@
 module Parsing.Parser
     ( Parser
     , ParseResult
+    , (<|>)
     , (.&&.)
     , (.&&)
     , (&&.)

@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: ccdf3b449d903dfae7766937924cc266a125e8b5f0f95366b6290535d6e50bd4
+-- hash: f33a7207c9f44ca9041191586276b61a27c8fcb926ce3265974296c3242d6de0
 
 name:           haskell-parser
 version:        0.1.0.0
@@ -30,6 +30,7 @@ library
       Parsing.Parser
       Parsing.ParseState
       Parsing.Position
+      Parsing.Xml.XmlParser
   other-modules:
       Paths_haskell_parser
   hs-source-dirs:
@@ -46,6 +47,7 @@ test-suite haskell-parser-test
       Parsing.ParseErrorTest
       Parsing.ParserTest
       Parsing.PositionTest
+      Parsing.Xml.XmlParserTest
       Paths_haskell_parser
   hs-source-dirs:
       test
