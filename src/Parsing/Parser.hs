@@ -6,7 +6,9 @@ module Parsing.Parser
     , (.&&.)
     , (.&&)
     , (&&.)
+    , (<?>)
     , parse
+    , withError
     , option
     , zeroOrMore
     , oneOrMore
@@ -20,13 +22,15 @@ module Parsing.Parser
     , enclosed
     ) where
 
+import Data.Bifunctor (first)
 import Data.Char (isDigit)
+import Data.Functor ((<&>))
 import Control.Applicative (Alternative(..))
 import Control.Monad (MonadPlus)
 import Control.Monad.Trans.State.Lazy (StateT(..), runStateT)
 
 type Parser a = StateT String (Either String) a
-type ParseResult a = Either String a
+type ParseResult a = Either String (a, String)
 
 instance Alternative (Either String) where
     empty = Left "no alternative match"
@@ -36,11 +40,21 @@ instance Alternative (Either String) where
 
 instance MonadPlus (Either String)
 
-lift :: (String -> ParseResult (a, String)) -> Parser a
+lift :: (String -> ParseResult a) -> Parser a
 lift = StateT 
 
-parse :: Parser a -> String -> ParseResult (a, String)
+parse :: Parser a -> String -> ParseResult a
 parse = runStateT
+
+withError :: String -> Parser a -> Parser a
+withError err p = lift $ \s ->
+    case parse p s of
+        Left _ -> Left err
+        Right a -> Right a 
+
+infixl 3 <?>
+(<?>) :: Parser a -> String -> Parser a
+p <?> s = withError s p
 
 infixl 5 .&&.
 (.&&.) :: Parser a -> Parser b -> Parser (a, b)

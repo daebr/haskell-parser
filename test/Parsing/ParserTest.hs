@@ -14,6 +14,7 @@ suite = TestLabel "Parser" (TestList
     , pstrTest
     , pquotedstrTest
     , enclosedTest
+    , withErrorTest
     , altTest
     , tupleTest
     , ignoreTest
@@ -67,6 +68,13 @@ enclosedTest = TestLabel "enclosed" (TestList
   where
     pvalue = zeroOrMore (pwhen notEnclosingChar panychar)
     notEnclosingChar c = and $ (/=) c <$> ['(', ')', '<', '>']
+
+withErrorTest :: Test
+withErrorTest = TestLabel "withError" (TestList
+    [ TestCase $ assertEqual "success unchanged" (Right ('a',"bc")) $ parse (pchar 'a' <?> "my error") "abc"
+    , TestCase $ assertEqual "failure <?> msg" (Left "my error") $ parse (pchar 'a' <?> "my error") ""
+    , TestCase $ assertEqual "withError msg failure" (Left "my error") $ parse (withError "my error" $ pchar 'a') ""
+    ])
 
 altTest :: Test
 altTest = TestLabel "<|>" (TestList
