@@ -13,7 +13,7 @@ module Parsing.Parser
     , zeroOrMore
     , oneOrMore
     , anyOf
-    , pwhen
+    , pfilter
     , pchar
     , pdigit
     , panychar
@@ -83,10 +83,10 @@ match f = lift $ \case
     (x:xs) | f x -> Right (x, xs)
            | otherwise -> Left "parse failed"
 
-pwhen :: (a -> Bool) -> Parser a -> Parser a
-pwhen f p = p >>= \a -> if f a
+pfilter :: (a -> Bool) -> Parser a -> Parser a
+pfilter f p = p >>= \a -> if f a
                         then pure a
-                        else failWith "pwhen failed"
+                        else failWith "pfilter failed"
 
 option :: Parser a -> Parser (Maybe a)
 option p = Just <$> p <|> pure Nothing

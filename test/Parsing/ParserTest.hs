@@ -18,7 +18,7 @@ suite = TestLabel "Parser" (TestList
     , altTest
     , tupleTest
     , ignoreTest
-    , pwhenTest
+    , pfilterTest
     , optionTest
     , zeroOrMoreTest
     , oneOrMoreTest
@@ -66,7 +66,7 @@ enclosedTest = TestLabel "enclosed" (TestList
     , TestCase $ assertBool "no close" $ isLeft (parse (enclosed (pchar '(') (pchar ')') pvalue) "(value")
     ])
   where
-    pvalue = zeroOrMore (pwhen notEnclosingChar panychar)
+    pvalue = zeroOrMore (pfilter notEnclosingChar panychar)
     notEnclosingChar c = and $ (/=) c <$> ['(', ')', '<', '>']
 
 withErrorTest :: Test
@@ -99,11 +99,11 @@ ignoreTest = TestLabel "ignore" (TestList
     , TestCase $ assertBool "a .&& !" $ isLeft (parse (pchar 'a' .&& pchar 'c') "abc")
     ])
 
-pwhenTest :: Test
-pwhenTest = TestLabel "pwhen" (TestList
-    [ TestCase $ assertEqual "pwhen true" (Right ('a', "bc")) $ parse (pwhen (== 'a') $ pchar 'a') "abc"
-    , TestCase $ assertBool "pwhen false" $ isLeft (parse (pwhen (== 'b') $ pchar 'a') "abc")
-    , TestCase $ assertBool "pwhen fail" $ isLeft (parse (pwhen (== 'a') $ pchar 'b') "abc")
+pfilterTest :: Test
+pfilterTest = TestLabel "pfilter" (TestList
+    [ TestCase $ assertEqual "pfilter true" (Right ('a', "bc")) $ parse (pfilter (== 'a') $ pchar 'a') "abc"
+    , TestCase $ assertBool "pfilter false" $ isLeft (parse (pfilter (== 'b') $ pchar 'a') "abc")
+    , TestCase $ assertBool "pfilter fail" $ isLeft (parse (pfilter (== 'a') $ pchar 'b') "abc")
     ])
 
 optionTest :: Test
