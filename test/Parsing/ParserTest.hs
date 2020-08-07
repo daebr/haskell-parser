@@ -23,6 +23,7 @@ suite = TestLabel "Parser" (TestList
     , zeroOrMoreTest
     , oneOrMoreTest
     , anyOfTest
+    , eofTest
     ])
 
 pcharTest :: Test
@@ -133,4 +134,10 @@ anyOfTest = TestLabel "anyOf" (TestList
     [ TestCase $ assertEqual "match" (Right ('a', "bc")) $ parse (anyOf [pchar 'c', pchar 'b', pchar 'a']) "abc"
     , TestCase $ assertBool "no match" $ isLeft (parse (anyOf [pchar 'b', pchar 'c']) "abc")
     , TestCase $ assertBool "empty parsers" $ isLeft (parse (anyOf []) "abc")
+    ])
+
+eofTest :: Test
+eofTest = TestLabel "eof" (TestList
+    [ TestCase $ assertEqual "true" (Right ((), "")) $ parse eof ""
+    , TestCase $ assertBool "false" $ isLeft (parse eof "a")
     ])

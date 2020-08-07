@@ -20,6 +20,7 @@ module Parsing.Parser
     , pstr
     , pquotedstr
     , enclosed
+    , eof
     ) where
 
 import Data.Bifunctor (first)
@@ -79,7 +80,7 @@ anyOf = foldl (<|>) (failWith "anyOf failed")
 
 match :: (Char -> Bool) -> Parser Char
 match f = lift $ \case
-    [] -> Left "empty"
+    [] -> Left "eof"
     (x:xs) | f x -> Right (x, xs)
            | otherwise -> Left "parse failed"
 
@@ -96,6 +97,11 @@ enclosed pstart pend p = pstart &&. p .&& pend
 
 failWith :: String -> Parser a
 failWith = lift . const . Left
+
+eof :: Parser ()
+eof = lift $ \case
+    [] -> Right ((), [])
+    _ -> Left "not eof"
 
 pchar :: Char -> Parser Char
 pchar = match . (==)
