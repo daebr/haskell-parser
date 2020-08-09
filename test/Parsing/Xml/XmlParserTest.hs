@@ -11,21 +11,44 @@ import Parsing.Xml.XmlParser
 suite :: Test
 suite = TestLabel "XmlParser" (TestList
     [ pelementTest
+    , integrationTest
     ])
 
-evalP :: Parser a -> String -> Either String a
-evalP p = bimap message fst . parseString p
+evalP :: Parser a -> [String] -> Either String a
+evalP p = bimap message fst . parse p
+
+evalPS :: Parser a -> String -> Either String a
+evalPS p = bimap message fst . parseString p
 
 xelement :: String -> String -> XElement
-xelement n v = XElement (XName n) v
+xelement n v = XElement (XName n) (Value v)
 
 pelementTest :: Test
 pelementTest = TestLabel "pelement" (TestList
-    [ TestCase $ assertEqual "standard tags" (Right $ xelement "name" "value") $ evalP pelement "<name>value</name>"
-    , TestCase $ assertEqual "inline tag" (Right $ xelement "name" "") $ evalP pelement "<name />"
-    , TestCase $ assertEqual "empty tag" (Right $ xelement "name" "") $ evalP pelement "<name></name>"
-    , TestCase $ assertBool "no end tag" $ isLeft (evalP pelement "<name>value</othername>")
-    , TestCase $ assertBool "no end inline" $ isLeft (evalP pelement "<name /")
-    , TestCase $ assertBool "no slash inline" $ isLeft (evalP pelement "<name >")
-    , TestCase $ assertBool "empty tag" $ isLeft (evalP pelement "<>value</>")
+    [ TestCase $ assertEqual "standard tags" (Right $ xelement "name" "value") $ evalPS pelement "<name>value</name>"
+    , TestCase $ assertEqual "inline tag" (Right $ xelement "name" "") $ evalPS pelement "<name />"
+    , TestCase $ assertEqual "empty tag" (Right $ xelement "name" "") $ evalPS pelement "<name></name>"
+    , TestCase $ assertBool "no end tag" $ isLeft (evalPS pelement "<name>value</othername>")
+    , TestCase $ assertBool "no end inline" $ isLeft (evalPS pelement "<name /")
+    , TestCase $ assertBool "no slash inline" $ isLeft (evalPS pelement "<name >")
+    , TestCase $ assertBool "empty tag" $ isLeft (evalPS pelement "<>value</>")
     ])
+
+integrationTest :: Test
+integrationTest = TestCase $ assertEqual "integration" (Right expected) $ evalP xmlParser xml
+  where
+    xml =
+        [ "<root>"
+        , "   <items>"
+        , "       <item>"
+        , "           value"
+        , "       </item>"
+        , "   </items>"
+        , "</root>"
+        ]
+    expected = XDocument
+        ( XElement (XName "root")
+            ( Element $ XElement (XName "items")
+                ( Element $ XElement (XName "item") (Value "value") )
+            )
+        )
