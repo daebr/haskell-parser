@@ -23,6 +23,7 @@ suite = TestLabel "Parser" (TestList
     , zeroOrMoreTest
     , oneOrMoreTest
     , anyOfTest
+    , whitespaceTest
     , eofTest
     ])
 
@@ -134,6 +135,16 @@ anyOfTest = TestLabel "anyOf" (TestList
     [ TestCase $ assertEqual "match" (Right ('a', "bc")) $ parse (anyOf [pchar 'c', pchar 'b', pchar 'a']) "abc"
     , TestCase $ assertBool "no match" $ isLeft (parse (anyOf [pchar 'b', pchar 'c']) "abc")
     , TestCase $ assertBool "empty parsers" $ isLeft (parse (anyOf []) "abc")
+    ])
+
+whitespaceTest :: Test
+whitespaceTest = TestLabel "whitespace" (TestList
+    [ TestCase $ assertEqual "space" (Right (' ', "")) $ parse whitespace " "
+    , TestCase $ assertEqual "tab" (Right ('\t', "")) $ parse whitespace "\t"
+    , TestCase $ assertEqual "carriage return" (Right ('\r', "")) $ parse whitespace "\r"
+    , TestCase $ assertEqual "new line" (Right ('\n', "")) $ parse whitespace "\n"
+    , TestCase $ assertBool "empty" $ isLeft (parse whitespace "")
+    , TestCase $ assertBool "non whitespace" $ isLeft (parse whitespace "a")
     ])
 
 eofTest :: Test

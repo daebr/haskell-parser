@@ -20,6 +20,7 @@ module Parsing.Parser
     , pstr
     , pquotedstr
     , enclosed
+    , whitespace
     , eof
     ) where
 
@@ -108,6 +109,9 @@ pchar = match . (==)
 
 pdigit :: Parser Char
 pdigit = match isDigit
+
+whitespace :: Parser Char
+whitespace = match (`elem` [' ', '\t', '\r', '\n'])
 
 panychar :: Parser Char
 panychar = match $ const True
