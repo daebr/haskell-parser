@@ -37,6 +37,7 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - haskell-parser
+    - regex-pcre
     - test-framework
     - test-framework-hunit
     - HUnit
