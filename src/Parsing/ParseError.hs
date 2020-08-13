@@ -7,7 +7,7 @@ data ParseError = ParseError {
     message :: String,
     currentLine :: String,
     currentPos :: Position
-}
+} deriving (Eq)
 
 instance Show ParseError where
     show e = case (currentLine e) of

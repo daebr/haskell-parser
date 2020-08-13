@@ -8,6 +8,7 @@ module Parsing.Parser
     , (&&.)
     , (<?>)
     , parse
+    , parseString
     , withError
     , option
     , zeroOrMore
@@ -19,7 +20,6 @@ module Parsing.Parser
     , panychar
     , pstr
     , pquotedstr
-    , enclosed
     , whitespace
     , eof
     ) where
@@ -31,27 +31,56 @@ import Control.Applicative (Alternative(..))
 import Control.Monad (MonadPlus)
 import Control.Monad.Trans.State.Lazy (StateT(..), runStateT)
 
-type Parser a = StateT String (Either String) a
-type ParseResult a = Either String (a, String)
+import Parsing.ParseError (ParseError(..))
+import qualified Parsing.ParseState as ParseState
+import Parsing.ParseState (ParseState(..), Source, curLine, curCol)
+import Parsing.Position (Position)
+import qualified Parsing.Position as Pos
 
-instance Alternative (Either String) where
-    empty = Left "no alternative match"
+type Parser a = StateT ParseState (Either ParseError) a
+type ParseResult a = Either ParseError (a, ParseState)
+
+instance Alternative (Either ParseError) where
+    empty = Left (ParseError "Unknown failure" "" Pos.new)
+
     (Right a) <|> _ = Right a
     _ <|> (Right a) = Right a
-    _ <|> _ = empty
+    Left e <|> _ = Left e
 
-instance MonadPlus (Either String)
+instance MonadPlus (Either ParseError)
 
-lift :: (String -> ParseResult a) -> Parser a
+lift :: (ParseState -> ParseResult a) -> Parser a
 lift = StateT 
 
-parse :: Parser a -> String -> ParseResult a
-parse = runStateT
+parse :: Parser a -> Source -> ParseResult a
+parse p = runStateT p . ParseState.new
+
+parseString :: Parser a -> String -> ParseResult a
+parseString p = parse p . lines
+
+toError :: String -> ParseState -> ParseError
+toError msg s = ParseError msg curLine (position s)
+  where
+    curLine = case source s of
+        [] -> ""
+        (x:_) -> x
+
+next :: Parser Char
+next = lift doNext
+  where
+    doNext :: ParseState -> ParseResult Char
+    doNext s = case source s of
+        [] -> Left $ toError "EOF" s
+        (x:xs) | (curCol s) >= length x -> Right ('\n', s { source=xs, position=(Pos.nextLine $ position s) })
+               | otherwise -> Right(x !! curCol s, s { position=(Pos.nextCol $ position s) })
+
+failWith :: String -> Parser a
+failWith s = lift $ Left . toError s 
 
 withError :: String -> Parser a -> Parser a
-withError err p = lift $ \s ->
-    case parse p s of
-        Left _ -> Left err
+withError msg p = lift $ \s ->
+    case runStateT p s of
+        Left err -> Left $ err { message=msg }
         Right a -> Right a 
 
 infixl 3 <?>
@@ -77,50 +106,48 @@ oneOrMore :: Parser a -> Parser [a]
 oneOrMore p = (:) <$> p <*> (oneOrMore p <|> pure [])
 
 anyOf :: [Parser a] -> Parser a
-anyOf = foldl (<|>) (failWith "anyOf failed")
+anyOf = foldl (<|>) (failWith "No parser satisfied")
 
 match :: (Char -> Bool) -> Parser Char
-match f = lift $ \case
-    [] -> Left "eof"
-    (x:xs) | f x -> Right (x, xs)
-           | otherwise -> Left "parse failed"
+match f = next >>= \c ->
+    if f c
+    then pure c
+    else failWith "Failed to match Char"
 
 pfilter :: (a -> Bool) -> Parser a -> Parser a
-pfilter f p = p >>= \a -> if f a
-                        then pure a
-                        else failWith "pfilter failed"
+pfilter f p = p >>= \a ->
+    if f a
+    then pure a
+    else failWith "Parser filter invalidated entry"
 
 option :: Parser a -> Parser (Maybe a)
 option p = Just <$> p <|> pure Nothing
 
-enclosed :: Parser b -> Parser b -> Parser a -> Parser a
-enclosed pstart pend p = pstart &&. p .&& pend
-
-failWith :: String -> Parser a
-failWith = lift . const . Left
-
 eof :: Parser ()
-eof = lift $ \case
-    [] -> Right ((), [])
-    _ -> Left "not eof"
+eof = lift isEof
+  where
+    isEof :: ParseState -> ParseResult ()
+    isEof s = case source s of
+        [] -> Right ((), s)
+        _ -> Left $ toError "Expected EOF" s        
 
 pchar :: Char -> Parser Char
-pchar = match . (==)
+pchar c = match (== c) <?> "Expected '" <> show c <> "'"
 
 pdigit :: Parser Char
-pdigit = match isDigit
+pdigit = match isDigit <?> "Expected digit"
 
 whitespace :: Parser Char
-whitespace = match (`elem` [' ', '\t', '\r', '\n'])
+whitespace = match (`elem` [' ', '\t', '\r', '\n']) <?> "Expected whitespace"
 
 panychar :: Parser Char
 panychar = match $ const True
 
 pstr :: String -> Parser String
-pstr = traverse pchar
+pstr s = traverse pchar s <?> "Expected '" <> s <> "'"
 
 pquotedstr :: Parser String
-pquotedstr = quote &&. zeroOrMore nonQuote .&& quote
+pquotedstr = quote &&. zeroOrMore nonQuote .&& quote <?> "Expected quoted string"
   where
     quote = pchar '"'
     nonQuote = match (/= '"')
