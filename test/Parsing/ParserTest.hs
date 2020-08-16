@@ -14,6 +14,8 @@ suite = TestLabel "Parser" (TestList
     [ parseTest
     , parseStringTest
     , pcharTest
+    , pcharInTest
+    , pcharNotInTest
     , pdigitTest
     , pstrTest
     , pquotedstrTest
@@ -60,6 +62,18 @@ pcharTest = TestLabel "pchar" (TestList
     [ testSuccess "match" 'a' $ parse (pchar 'a') ["abc"]
     , testFailure "not match" $ parse (pchar 'b') ["abc"]
     , testFailure "empty" $ parse (pchar 'a') []
+    ])
+
+pcharInTest :: Test
+pcharInTest = TestLabel "pcharIn" (TestList
+    [ testSuccess "match" 'c' $ parse (pcharIn "abc") ["c"]
+    , testFailure "not match" $ parse (pcharIn "abc") ["d"]
+    ])
+
+pcharNotInTest :: Test
+pcharNotInTest = TestLabel "pcharNotIn" (TestList
+    [ testSuccess "not match" 'd' $ parse (pcharNotIn "abc") ["d"]
+    , testFailure "match" $ parse (pcharNotIn "abc") ["c"]
     ])
 
 pdigitTest :: Test

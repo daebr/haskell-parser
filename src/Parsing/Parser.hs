@@ -16,6 +16,8 @@ module Parsing.Parser
     , anyOf
     , pfilter
     , pchar
+    , pcharIn
+    , pcharNotIn
     , pdigit
     , pstr
     , pquotedstr
@@ -107,18 +109,18 @@ oneOrMore p = (:) <$> p <*> (oneOrMore p <|> pure [])
 anyOf :: [Parser a] -> Parser a
 anyOf = foldl (<|>) (failWith "No parser satisfied")
 
-match :: (Char -> Bool) -> Parser Char
-match f = next >>= \c ->
-    if f c
-    then pure c
-    else failWith "Failed to match Char"
-
 pfilter :: (a -> Bool) -> Parser a -> Parser a
 pfilter f p = lift $ \s ->
     case runStateT p s of
         Right (a, s') | f a -> Right (a, s')
                       | otherwise ->  Left $ toError "Failed to satisfy filter" s
         Left e -> Left e
+
+match :: (Char -> Bool) -> Parser Char
+match f = next >>= \c ->
+    if f c
+    then pure c
+    else failWith "Failed to match Char"
 
 option :: Parser a -> Parser (Maybe a)
 option p = Just <$> p <|> pure Nothing
@@ -133,6 +135,12 @@ eof = lift isEof
 
 pchar :: Char -> Parser Char
 pchar c = match (== c) <?> "Expected '" <> show c <> "'"
+
+pcharIn :: [Char] -> Parser Char
+pcharIn = match . flip elem
+
+pcharNotIn :: [Char] -> Parser Char
+pcharNotIn cs = match $ not . flip elem cs
 
 pdigit :: Parser Char
 pdigit = match isDigit <?> "Expected digit"
