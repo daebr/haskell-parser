@@ -17,7 +17,6 @@ module Parsing.Parser
     , pfilter
     , pchar
     , pdigit
-    , panychar
     , pstr
     , pquotedstr
     , whitespace
@@ -115,10 +114,11 @@ match f = next >>= \c ->
     else failWith "Failed to match Char"
 
 pfilter :: (a -> Bool) -> Parser a -> Parser a
-pfilter f p = p >>= \a ->
-    if f a
-    then pure a
-    else failWith "Parser filter invalidated entry"
+pfilter f p = lift $ \s ->
+    case runStateT p s of
+        Right (a, s') | f a -> Right (a, s')
+                      | otherwise ->  Left $ toError "Failed to satisfy filter" s
+        Left e -> Left e
 
 option :: Parser a -> Parser (Maybe a)
 option p = Just <$> p <|> pure Nothing
@@ -139,9 +139,6 @@ pdigit = match isDigit <?> "Expected digit"
 
 whitespace :: Parser Char
 whitespace = match (`elem` [' ', '\t', '\r', '\n']) <?> "Expected whitespace"
-
-panychar :: Parser Char
-panychar = match $ const True
 
 pstr :: String -> Parser String
 pstr s = traverse pchar s <?> "Expected '" <> s <> "'"

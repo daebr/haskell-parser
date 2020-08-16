@@ -15,7 +15,6 @@ suite = TestLabel "Parser" (TestList
     , parseStringTest
     , pcharTest
     , pdigitTest
-    , panycharTest
     , pstrTest
     , pquotedstrTest
     , withErrorTest
@@ -72,13 +71,6 @@ pdigitTest = TestLabel "pdigit" (TestList
     testDigit :: Char -> Test
     testDigit d = testSuccess "match" d $ parse pdigit [[d]]
 
-panycharTest :: Test
-panycharTest = TestLabel "panychar" (TestList
-    [ testSuccess "exists" 'a' $ parse panychar ["abc"]
-    , testSuccess "empty line" '\n' $ parse panychar [""]
-    , testFailure "empty" $ parse panychar []
-    ])
-
 pstrTest :: Test
 pstrTest = TestLabel "pstr" (TestList
     [ testSuccess "match" "abc" $ parse (pstr "abc") ["abc"]
@@ -126,7 +118,8 @@ combinerTest = TestLabel "combiners" (TestList [tuples, ignores])
 
 pfilterTest :: Test
 pfilterTest = TestLabel "pfilter" (TestList
-    [ testSuccess "pfilter true" 'a' $ parseString (pfilter (== 'a') $ pchar 'a') "abc"
+    [ testSuccess "true" 'a' $ parseString (pfilter (== 'a') $ pchar 'a') "abc"
+    , testSuccess "false or true" 'a' $ parseString (pfilter (== 'b') (pchar 'a') <|> pchar 'a') "abc" 
     , testFailure "pfilter false" $ parseString (pfilter (== 'b') $ pchar 'a') "abc"
     , testFailure "pfilter fail" $ parseString (pfilter (== 'a') $ pchar 'b') "abc"
     ])
