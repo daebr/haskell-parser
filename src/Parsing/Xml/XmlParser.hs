@@ -33,6 +33,7 @@ data XElement = XElement XName [XAttr] XNode deriving (Eq, Show)
 data XNode
     = Elements [XElement]
     | Value XValue
+    | Empty
   deriving (Eq, Show)
 
 newtype XDocument = XDocument { root :: XElement } deriving (Eq, Show)
@@ -41,7 +42,7 @@ xmlParser :: Parser XDocument
 xmlParser = XDocument <$> pelement
 
 pname :: Parser XName
-pname = XName <$> oneOrMore (anyOf $ pchar <$> nameChars)
+pname = XName <$> oneOrMore (pcharIn nameChars)
         & withError "Invalid name"
   where
     nameChars = concat
@@ -53,40 +54,52 @@ pname = XName <$> oneOrMore (anyOf $ pchar <$> nameChars)
 anyWhitespace :: Parser String
 anyWhitespace = zeroOrMore whitespace
 
-openingTag :: Parser XName
-openingTag = (pchar '<') &&. pname .&& (pchar '>')
+pempty :: Parser XNode
+pempty = pure Empty
 
 pvalue :: Parser XValue
-pvalue = fmap trim . zeroOrMore $ pfilter (not . flip elem disallowedChars) panychar
+pvalue = anyWhitespace &&. (fmap trim . oneOrMore $ pcharNotIn disallowedChars)
   where
-    disallowedChars = [ '<', '>', '\r', '\n' ]
+    disallowedChars = [ '<', '>', '\r', '\n', '"' ]
 
 pelement :: Parser XElement
-pelement = ptaggedElement
+pelement = pinlineElement <|> ptaggedElement
 
 ptaggedElement :: Parser XElement
 ptaggedElement = XElement 
-                 <$> (pchar '<') &&. pname .&& (pchar '>')
-                 <*> pure [] 
-                 <*> anyWhitespace &&. pnode .&& anyWhitespace
-                 >>= \(XElement name attrs node) -> pure (XElement name attrs node) .&& anyWhitespace .&& closingTag name .&& anyWhitespace
+                 <$> pchar '<' &&. pname
+                 <*> pattrs .&& pchar '>'
+                 <*> pnode
+                 >>= \(XElement name attrs node) -> pure (XElement name attrs node) .&& closingTag name
   where
+    openingTag :: Parser XName
+    openingTag = (pchar '<') &&. pname .&& (pchar '>')
+
     closingTag :: XName -> Parser XName
     closingTag n = (pstr "</") &&. (pfilter (== n) pname) .&& (pstr ">")
                    -- & withError "Closing tag expected for '" <> toXml n <> "'"
 
 pinlineElement :: Parser XElement
-pinlineElement = XElement <$> (pstr "<") &&. pname .&& (pstr " />") <*> pure [] <*> noValue
+pinlineElement = XElement <$> (pchar '<') &&. pname <*> pattrs <*> pempty .&& (pstr " />") 
+
+pattrs :: Parser [XAttr]
+pattrs = zeroOrMore (pchar ' ' &&. pattr)
   where
-    noValue :: Parser XNode
-    noValue = pure $ Value ""
+    pattr :: Parser XAttr
+    pattr =
+        XAttr
+        <$> pname
+            .&& zeroOrOne (pchar ' ')
+            .&& pchar '='
+            .&& zeroOrOne (pchar ' ')
+        <*> pchar '"' &&. pvalue .&& pchar '"' 
 
 pnode :: Parser XNode
-pnode = Elements <$> pelementList <|> Value <$> pvalue
+pnode = anyWhitespace &&. (Value <$> pvalue <|> Elements <$> pelementList <|> pempty) .&& anyWhitespace
         & withError "Invalid node"
   where
     pelementList :: Parser [XElement]
-    pelementList = zeroOrMore (pelement .&& anyWhitespace)
+    pelementList = oneOrMore (pelement .&& anyWhitespace)
 
 instance Xml XValue where
     toXml s = s

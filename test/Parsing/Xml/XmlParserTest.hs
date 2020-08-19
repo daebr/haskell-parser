@@ -1,10 +1,10 @@
 module Parsing.Xml.XmlParserTest where
 
-import Data.Bifunctor (bimap)
+import Data.Bifunctor (second)
 import Data.Either (isLeft)
 import Test.HUnit
 
-import Parsing.ParseError (message)
+import Parsing.ParseError (ParseError)
 import Parsing.Parser
 import Parsing.Xml.XmlParser
 
@@ -14,13 +14,14 @@ suite = TestLabel "XmlParser" (TestList
     , integrationTest
     ])
 
-evalP :: Parser a -> [String] -> Either String a
-evalP p = bimap message fst . parse p
+evalP :: Parser a -> [String] -> Either ParseError a
+evalP p = second fst . parse p
 
-evalPS :: Parser a -> String -> Either String a
-evalPS p = bimap message fst . parseString p
+evalPS :: Parser a -> String -> Either ParseError a
+evalPS p = second fst . parseString p
 
 xelement :: String -> [XAttr] -> String -> XElement
+xelement n as [] = XElement (XName n) as Empty
 xelement n as v = XElement (XName n) as (Value v)
 
 xattr :: String -> String -> XAttr
@@ -53,6 +54,7 @@ integrationTest = TestCase $ assertEqual "integration" (Right expected) $ evalP 
         , "       <item id=\"2\">"
         , "           value 2"
         , "       </item>"
+        , "       <item id=\"3\" />"
         , "   </items>"
         , "</root>"
         ]
@@ -63,6 +65,7 @@ integrationTest = TestCase $ assertEqual "integration" (Right expected) $ evalP 
                     ( Elements
                         [ XElement (XName "item") [XAttr (XName "id") "1"] (Value "value 1")
                         , XElement (XName "item") [XAttr (XName "id") "2"] (Value "value 2")
+                        , XElement (XName "item") [XAttr (XName "id") "3"] Empty
                         ]
                     )
                 ]

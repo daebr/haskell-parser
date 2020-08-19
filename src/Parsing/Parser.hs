@@ -14,6 +14,7 @@ module Parsing.Parser
     , option
     , zeroOrMore
     , oneOrMore
+    , zeroOrOne
     , anyOf
     , pfilter
     , pchar
@@ -67,14 +68,19 @@ toError msg s = ParseError msg curLine (position s)
         [] -> ""
         (x:_) -> x
 
-next :: Parser Char
-next = lift doNext
+next :: (Char -> Bool) -> Parser Char
+next f = lift doNext
   where
     doNext :: ParseState -> ParseResult Char
     doNext s = case source s of
         [] -> Left $ toError "EOF" s
-        (x:xs) | (curCol s) >= length x -> Right ('\n', s { source=xs, position=(Pos.nextLine $ position s) })
-               | otherwise -> Right(x !! curCol s, s { position=(Pos.nextCol $ position s) })
+        (x:xs) | (curCol s) >= length x -> satisfy '\n' $ s { source=xs, position=(Pos.nextLine $ position s) }
+               | otherwise -> satisfy (x !! curCol s) $ s { position=(Pos.nextCol $ position s) }
+     where
+        satisfy c s' =
+            if f c
+            then Right (c, s')
+            else Left $ toError ("Unexpected " <> show c) s
 
 failWith :: String -> Parser a
 failWith s = lift $ Left . toError s 
@@ -107,6 +113,9 @@ zeroOrMore p = oneOrMore p <|> pure []
 oneOrMore :: Parser a -> Parser [a]
 oneOrMore p = (:) <$> p <*> (oneOrMore p <|> pure [])
 
+zeroOrOne :: Parser a -> Parser (Maybe a)
+zeroOrOne = option
+
 anyOf :: [Parser a] -> Parser a
 anyOf = foldl (<|>) (failWith "No parser satisfied")
 
@@ -118,10 +127,7 @@ pfilter f p = lift $ \s ->
         Left e -> Left e
 
 match :: (Char -> Bool) -> Parser Char
-match f = next >>= \c ->
-    if f c
-    then pure c
-    else failWith "Failed to match Char"
+match = next
 
 option :: Parser a -> Parser (Maybe a)
 option p = Just <$> p <|> pure Nothing
