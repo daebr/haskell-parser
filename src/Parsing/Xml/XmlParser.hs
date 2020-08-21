@@ -8,6 +8,7 @@ module Parsing.Xml.XmlParser
     , XName(..)
     , XValue(..)
     , xmlParser
+    , pname
     , pnode
     , pelement
     , pvalue
@@ -42,14 +43,19 @@ xmlParser :: Parser XDocument
 xmlParser = XDocument <$> pelement
 
 pname :: Parser XName
-pname = XName <$> oneOrMore (pcharIn nameChars)
-        & withError "Invalid name"
+pname = fmap XName
+    . pfilter ((`notElem` disallowedStartOrEndChars) . head) 
+    . pfilter ((`notElem` disallowedStartOrEndChars) . last) 
+    $ oneOrMore (pcharIn allowedChars)
+    & withError "Invalid name"
   where
-    nameChars = concat
+    allowedChars = concat
         [ [ 'A'..'Z']
         , [ 'a'..'z']
         , [ '0'..'9']
+        , [ '-' ]
         ]
+    disallowedStartOrEndChars = [ '-' ]
 
 anyWhitespace :: Parser String
 anyWhitespace = zeroOrMore whitespace
@@ -88,10 +94,7 @@ pattrs = zeroOrMore (pchar ' ' &&. pattr)
     pattr :: Parser XAttr
     pattr =
         XAttr
-        <$> pname
-            .&& zeroOrOne (pchar ' ')
-            .&& pchar '='
-            .&& zeroOrOne (pchar ' ')
+        <$> pname .&& pchar '='
         <*> pchar '"' &&. pvalue .&& pchar '"' 
 
 pnode :: Parser XNode

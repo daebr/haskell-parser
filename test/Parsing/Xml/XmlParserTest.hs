@@ -10,15 +10,18 @@ import Parsing.Xml.XmlParser
 
 suite :: Test
 suite = TestLabel "XmlParser" (TestList
-    [ pelementTest
+    [ emptyDocumentTest
+    , rootTest
+    , elementTest
+    , attributeTest
     , integrationTest
     ])
 
-evalP :: Parser a -> [String] -> Either ParseError a
-evalP p = second fst . parse p
+eval :: [String] -> Either ParseError XDocument
+eval = second fst . parse xmlParser
 
-evalPS :: Parser a -> String -> Either ParseError a
-evalPS p = second fst . parseString p
+evalS :: String -> Either ParseError XDocument
+evalS = second fst . parseString xmlParser
 
 xelement :: String -> [XAttr] -> String -> XElement
 xelement n as [] = XElement (XName n) as Empty
@@ -27,23 +30,115 @@ xelement n as v = XElement (XName n) as (Value v)
 xattr :: String -> String -> XAttr
 xattr n = XAttr (XName n)
 
-pelementTest :: Test
-pelementTest = TestLabel "pelement" (TestList
-    [ TestCase $ assertEqual "standard tags" (Right $ xelement "name" [] "value") $ evalPS pelement "<name>value</name>"
-    , TestCase $ assertEqual "inline tag" (Right $ xelement "name" [] "") $ evalPS pelement "<name />"
-    , TestCase $ assertEqual "empty tag" (Right $ xelement "name" [] "") $ evalPS pelement "<name></name>"
-    , TestCase $ assertEqual "standard w/ attrs" (Right $ xelement "name" [xattr "attr1" "1", xattr "attr2" "2"] "") $ evalPS pelement "<name attr1=\"1\" attr2=\"2\"></name>"
-    , TestCase $ assertEqual "inline w/ attrs" (Right $ xelement "name" [xattr "attr1" "1", xattr "attr2" "2"] "") $ evalPS pelement "<name attr1=\"1\" attr2=\"2\" />"
-    , TestCase $ assertBool "no end tag" $ isLeft (evalPS pelement "<name>value</othername>")
-    , TestCase $ assertBool "no end inline" $ isLeft (evalPS pelement "<name /")
-    , TestCase $ assertBool "no slash inline" $ isLeft (evalPS pelement "<name >")
-    , TestCase $ assertBool "empty tag" $ isLeft (evalPS pelement "<>value</>")
-    , TestCase $ assertBool "no closing attr quote" $ isLeft (evalPS pelement "<name attr=\"1 />")
-    , TestCase $ assertBool "no attr quote" $ isLeft (evalPS pelement "<name attr=1 />")
+emptyDocumentTest :: Test
+emptyDocumentTest = TestLabel "empty doc" (TestList
+    [ TestCase $ assertBool "empty lines" $ isLeft (eval [])
+    , TestCase $ assertBool "empty line string" $ isLeft (eval [""])
+    , TestCase $ assertBool "empty string" $ isLeft (evalS "")
     ])
 
+rootTest :: Test
+rootTest = TestLabel "root" (TestList
+    [ TestCase $ assertEqual "tag" expected $ eval emptyRoot
+    , TestCase $ assertEqual "inline" expected $ eval emptyRootInline
+    , TestCase $ assertEqual "string" expected $ evalS emptyRootString
+    , TestCase $ assertEqual "one line string" expected $ evalS emptyRootStringOneLine
+    ])
+  where
+    expected = Right . XDocument $ XElement (XName "root") [] Empty
+    emptyRoot =
+        [ "<root>"
+        , "</root>"
+        ]
+    emptyRootInline = [ "<root />" ]
+    emptyRootString = "<root>\n</root>"
+    emptyRootStringOneLine = "<root></root>"
+
+elementTest :: Test
+elementTest = TestList
+    [ shallowElementTest
+    , nestedElementTest
+    ]
+
+shallowElementTest :: Test
+shallowElementTest = TestLabel "standalone element" (TestList
+    [ success "single" (mkDoc ["element1"]) $ mkXml ["<element1 />"]
+    , success "multiple" (mkDoc ["element1", "element2"]) $ mkXml ["<element1 />", "<element2 />"]
+    , success "dashed-name" (mkDoc ["element-1"]) $ mkXml ["<element-1 />"]
+    , success "one letter name" (mkDoc ["a"]) $ mkXml ["<a />"]
+    , success "mix of styles" (mkDoc ["element1", "element2"]) $ mkXml ["<element1>", "</element1>", "<element2 />"]
+    , failure "malformed tag" $ mkXml ["<element1", "</element1>"]
+    , failure "no closing tag" $ mkXml ["<element1>"]
+    , failure "space in name" $ mkXml ["<element 1>", "</element 1>"]
+    , failure "wrong inline slash" $ mkXml ["<element1 \\>"]
+    , failure "dash-at-start" $ mkXml ["<-element />"]
+    , failure "dash-at-end" $ mkXml ["<element- />"]
+    ])
+  where
+    success :: String -> XDocument -> [String] -> Test
+    success name expected xml = TestCase $ assertEqual name (Right expected) $ eval xml
+
+    failure :: String -> [String] -> Test
+    failure name xml = TestCase $ assertBool name $ isLeft (eval xml)
+
+    mkDoc es = XDocument $ XElement (XName "root") [] $ Elements $ (\n -> xelement n [] "") <$> es
+    mkXml es = concat
+        [ [ "<root>" ]
+        , ("  " <>) <$> es
+        , [ "</root>" ]
+        ]
+
+nestedElementTest :: Test
+nestedElementTest = TestLabel "nested element" (TestList
+    [ success "single" (mkDoc ["nested-element"]) $ mkXml ["<nested-element />"]
+    , success "multiple" (mkDoc ["nested-element-1", "nested-element-2"]) $ mkXml ["<nested-element-1 />", "<nested-element-2 />"]
+    ])
+  where
+    success :: String -> XDocument -> [String] -> Test
+    success name expected xml = TestCase $ assertEqual name (Right expected) $ eval xml
+
+    mkDoc es = 
+        XDocument
+        $ XElement (XName "root") [] 
+            $ Elements $ [ XElement (XName "element") []
+                $ Elements $ (\n -> xelement n [] "") <$> es
+            ]
+    mkXml es = concat
+        [ [ "<root>" ]
+        , [ "  <element>" ]
+        , ("    " <>) <$> es
+        , [ "  </element>" ]
+        , [ "</root>" ]
+        ]
+
+
+attributeTest :: Test
+attributeTest = TestLabel "attribute" (TestList
+    [ success "single attribute" [xattr "name" "value"] "name=\"value\""
+    , success "multiple attributes" [xattr "name1" "value 1", xattr "name2" "value 2"] "name1=\"value 1\" name2=\"value 2\""
+    , success "dashed-name" [xattr "attr-name" "value"] "attr-name=\"value\""
+    , failure "no quotes" "name=value"
+    , failure "no opening quote" "name=value\""
+    , failure "no closing quote" "name=\"value"
+    , failure "no equals" "name \"value\""
+    , failure "space in name" "name 1=\"value\""
+    , failure "spaced equals" "name = \"value\""
+    ])
+  where
+    failure name attrs = TestCase $ assertBool name $ isLeft (mkActualTagged attrs)
+
+    success name expected attrs = TestLabel name (TestList
+        [ TestCase $ assertEqual "tagged" (mkExpected expected) (mkActualTagged attrs)
+        , TestCase $ assertEqual "inline" (mkExpected expected) (mkActualInline attrs)
+        ])
+
+    mkExpected attrs = Right . XDocument $ XElement (XName "root") attrs Empty
+
+    mkActualTagged attrs = evalS $ "<root " <> attrs <> "></root>"
+    mkActualInline attrs = evalS $ "<root " <> attrs <> " />" 
+
 integrationTest :: Test
-integrationTest = TestCase $ assertEqual "integration" (Right expected) $ evalP xmlParser xml
+integrationTest = TestCase $ assertEqual "integration" (Right expected) $ eval xml
   where
     xml =
         [ "<root>"
