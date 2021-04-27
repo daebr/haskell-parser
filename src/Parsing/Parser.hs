@@ -10,6 +10,7 @@ module Parsing.Parser
     , parse
     , parseString
     , withError
+    , failWith
     , option
     , zeroOrMore
     , oneOrMore
