@@ -22,12 +22,13 @@ module Parsing.Parser
     , pstr
     , pquotedstr
     , whitespace
+    , eol
     , eof
     ) where
 
 import Data.Bifunctor (first)
 import Data.Char (isDigit)
-import Data.Functor ((<&>))
+import Data.Functor (($>), (<&>))
 import Control.Applicative (Alternative(..))
 import Control.Monad (MonadPlus)
 import Control.Monad.Trans.State.Lazy (StateT(..), runStateT)
@@ -125,8 +126,13 @@ match f = next >>= \c ->
 option :: Parser a -> Parser (Maybe a)
 option p = Just <$> p <|> pure Nothing
 
+eol :: Parser ()
+eol = oneOrMore carriageReturnNewLine $> ()
+  where
+    carriageReturnNewLine = match (`elem` ['\r', '\n'])
+
 eof :: Parser ()
-eof = lift isEof
+eof = zeroOrMore eol &&. lift isEof
   where
     isEof :: ParseState -> ParseResult ()
     isEof s = case source s of

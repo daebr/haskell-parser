@@ -28,6 +28,7 @@ suite = TestLabel "Parser" (TestList
     , oneOrMoreTest
     , anyOfTest
     , whitespaceTest
+    , eolTest
     , eofTest
     ])
 
@@ -179,9 +180,20 @@ whitespaceTest = TestLabel "whitespace" (TestList
     , testFailure "non whitespace" $ parse whitespace ["a"]
     ])
 
+eolTest :: Test
+eolTest = TestLabel "eol" $ TestList
+    [ testSuccess "empty string" () $ parse eol [""]
+    , testSuccess "newline" () $ parseString eol "\n"
+    , testSuccess "carriage return" () $ parseString eol "\r"
+    , testSuccess "cr/nl" () $ parseString eol "\r\n"
+    , testFailure "empty" $ parse eol []
+    , testFailure "non eol" $ parse eol ["a"]
+    ]
+
 eofTest :: Test
 eofTest = TestLabel "eof" (TestList
-    [ testSuccess "empty string" () $ parseString eof ""
+    [ testSuccess "empty" () $ parseString eof ""
     , testSuccess "empty source" () $ parse eof []
-    , testFailure "non-empty" $ parse eof [""]
+    , testSuccess "empty string" () $ parse eof [""]
+    , testFailure "non-empty" $ parse eof ["a"]
     ])
