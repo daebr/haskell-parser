@@ -17,6 +17,7 @@ suite = TestLabel "Parser" (TestList
     , pcharInTest
     , pcharNotInTest
     , pdigitTest
+    , pintTest
     , pstrTest
     , pquotedstrTest
     , withErrorTest
@@ -85,6 +86,16 @@ pdigitTest = TestLabel "pdigit" (TestList
   where
     testDigit :: Char -> Test
     testDigit d = testSuccess "match" d $ parse pdigit [[d]]
+
+pintTest :: Test
+pintTest = TestLabel "pint" $ TestList
+    [ TestList (testInt <$> ([0..9] <> [123, 4567, 89012345, -1, -0, -123, -4567, -89012]))
+    , testFailure "not match" $ parse pint ["a"]
+    , testFailure "empty" $ parse pint [""]
+    ]
+  where
+    testInt :: Int -> Test
+    testInt i = testSuccess ("match " <> show i) i $ parse pint [show i]
 
 pstrTest :: Test
 pstrTest = TestLabel "pstr" (TestList

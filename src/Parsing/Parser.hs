@@ -20,6 +20,7 @@ module Parsing.Parser
     , pcharIn
     , pcharNotIn
     , pdigit
+    , pint
     , pstr
     , pquotedstr
     , whitespace
@@ -28,8 +29,10 @@ module Parsing.Parser
     ) where
 
 import Data.Bifunctor (first)
+import Data.Bool (bool)
 import Data.Char (isDigit)
 import Data.Functor (($>), (<&>))
+import Data.Maybe (isJust)
 import Control.Applicative (Alternative(..))
 import Control.Monad (MonadPlus)
 import Control.Monad.Trans.State.Lazy (StateT(..), runStateT)
@@ -151,6 +154,11 @@ pcharNotIn cs = match $ not . flip elem cs
 
 pdigit :: Parser Char
 pdigit = match isDigit <?> "Expected digit"
+
+pint :: Parser Int
+pint =
+    (bool id negate . isJust <$> option (pchar '-'))
+    >>= \f -> f . read <$> oneOrMore pdigit
 
 whitespace :: Parser Char
 whitespace = match (`elem` [' ', '\t', '\r', '\n']) <?> "Expected whitespace"
