@@ -1,16 +1,23 @@
 import Data.Functor (void)
 import Test.HUnit
+import Test.QuickCheck
 
-import qualified Parsing.ParseErrorTest as ParseError
 import qualified Parsing.ParserTest as Parser
 import qualified Parsing.PositionTest as Position
-
-fullSuite :: Test
-fullSuite = TestList
-    [ Parser.suite
-    , Position.suite
-    , ParseError.suite
-    ]
+import qualified Parsing.StringParserCheck as StringParser
 
 main :: IO ()
-main = void $ runTestTT fullSuite
+main = do
+    runQuickCheck
+    runHUnit
+
+runHUnit :: IO ()
+runHUnit = void $ runTestTT suite
+  where
+    suite = TestList
+        [ Parser.suite
+        , Position.suite
+        ]
+
+runQuickCheck :: IO ()
+runQuickCheck = StringParser.runSuite

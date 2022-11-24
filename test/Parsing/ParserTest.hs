@@ -1,210 +1,157 @@
 module Parsing.ParserTest where
 
 import Control.Applicative ((<|>))
-import Data.Bifunctor (first)
+import Data.Bifunctor (bimap)
 import Data.Either (isLeft)
+import Data.List.NonEmpty (NonEmpty(..))
+import Data.Void (Void)
 import Test.HUnit
 
-import Parsing.ParseError (ParseError(..))
-import Parsing.ParseState (ParseState(..))
 import Parsing.Parser
 
 suite :: Test
-suite = TestLabel "Parser" (TestList
-    [ parseTest
-    , parseStringTest
-    , pcharTest
-    , pcharInTest
-    , pcharNotInTest
-    , pdigitTest
-    , pintTest
-    , pstrTest
-    , pquotedstrTest
-    , withErrorTest
-    , altTest
-    , combinerTest
-    , pfilterTest
-    , optionTest
-    , zeroOrMoreTest
+suite = TestLabel "Parser" $ TestList
+    [ anyOfTest
+    , anyOfNETest
+    , applicativeTest
+    , bifunctorTest
+    , evalTest
+    , execTest
+    , failureTest
+    , functorTest
+    , mapErrorTest
+    , monadTest
     , oneOrMoreTest
-    , anyOfTest
-    , whitespaceTest
-    , eolTest
-    , eofTest
-    ])
+    , optionTest
+    , orElseTest
+    , parseTest
+    , pendTest
+    , setErrorTest
+    , runTest
+    , zeroOrMoreTest
+    ]
 
-punit :: Parser ()
+punit :: Parser [Int] e ()
 punit = pure ()
 
-testSuccess :: (Eq a, Show a) => String -> a -> ParseResult a -> Test
-testSuccess name expected actual = TestLabel name (TestCase $ assertEqual "value" (Right expected) $ fst <$> actual)
+pequal :: Eq a => a -> Parser [a] MatchError a
+pequal = match . (==) 
 
-testFailure :: String -> ParseResult a -> Test
-testFailure name actual = TestLabel name (TestCase $ assertBool "isLeft" $ isLeft actual)
+pnext :: Parser [Int] MatchError Int
+pnext = match (const True)
+
+failInt :: e -> Parser [Int] e Int
+failInt = failure
+
+----
 
 parseTest :: Test
-parseTest = TestLabel "parse" (TestList
-    [ testSuccess "simple" () $ parse punit [""]
-    , testSuccess "across lines" "a\nb" $ parse (pstr "a\nb") ["a","b","c"]
-    , testSuccess "inline newline" "a\nb" $ parse (pstr "a\nb") ["a\nb\nc"]
-    , testSuccess "empty" () $ parse punit []
-    , testSuccess "emptyLine" '\n' $ parse (pchar '\n') [""]
-    ]) 
+parseTest = TestCase $ assertEqual "parse" (Right 1) $ parse pnext [1..3]
 
-parseStringTest :: Test
-parseStringTest = TestLabel "parseString" (TestList
-    [ testSuccess "simple" () $ parseString punit "a"
-    , testSuccess "across lines" "a\nb" $ parseString (pstr "a\nb") "a\nb\nc"
-    , testSuccess "empty" () $ parseString punit ""
-    , testSuccess "empty line" '\n' $ parseString (pchar '\n') "\n"
-    ])
+execTest :: Test
+execTest = TestCase $ assertEqual "exec" (Right 1) $ exec pnext [1..3]
 
-pcharTest :: Test
-pcharTest = TestLabel "pchar" (TestList
-    [ testSuccess "match" 'a' $ parse (pchar 'a') ["abc"]
-    , testFailure "not match" $ parse (pchar 'b') ["abc"]
-    , testFailure "empty" $ parse (pchar 'a') []
-    ])
+evalTest :: Test
+evalTest = TestCase $ assertEqual "eval" (Right [2,3]) $ eval pnext [1..3]
 
-pcharInTest :: Test
-pcharInTest = TestLabel "pcharIn" (TestList
-    [ testSuccess "match" 'c' $ parse (pcharIn "abc") ["c"]
-    , testFailure "not match" $ parse (pcharIn "abc") ["d"]
-    ])
+runTest :: Test
+runTest = TestLabel "run" $ TestCase $ assertEqual "run" (Right (1, [2,3])) $ run pnext [1..3]
 
-pcharNotInTest :: Test
-pcharNotInTest = TestLabel "pcharNotIn" (TestList
-    [ testSuccess "not match" 'd' $ parse (pcharNotIn "abc") ["d"]
-    , testFailure "match" $ parse (pcharNotIn "abc") ["c"]
-    ])
+failureTest :: Test
+failureTest = TestCase $ assertEqual "failure" (Left "error") $ parse (failInt "error") []
 
-pdigitTest :: Test
-pdigitTest = TestLabel "pdigit" (TestList
-    [ TestList (testDigit <$> "0123456789")
-    , testFailure "not match" $ parse pdigit ["a"]
-    ])
-  where
-    testDigit :: Char -> Test
-    testDigit d = testSuccess "match" d $ parse pdigit [[d]]
+failIfTest :: Test
+failIfTest = TestLabel "failIf" $ TestList
+    [ TestCase $ assertEqual "fail" (Left NoInput) $ parse (failIf (const NoInput) (== 1) pnext) [1..3]
+    , TestCase $ assertEqual "succeed" (Right 1) $ parse (failIf (const NoInput) (== 0) pnext) [1..3]
+    ]
 
-pintTest :: Test
-pintTest = TestLabel "pint" $ TestList
-    [ TestList (testInt <$> ([0..9] <> [123, 4567, 89012345, -1, -0, -123, -4567, -89012]))
-    , testFailure "not match" $ parse pint ["a"]
-    , testFailure "empty" $ parse pint [""]
+mapErrorTest :: Test
+mapErrorTest = TestLabel "mapError" $ TestList
+    [ TestCase $ assertEqual "success" (Right 1) $ parse (mapError id pnext) [1..3]
+    , TestCase $ assertEqual "failure" (Left $ show NoInput) $ parse (mapError show pnext)  []
+    , TestCase $ assertEqual "infix" (Left $ show NoInput) $ parse (pnext <?> show) []
+    ]
+
+setErrorTest :: Test
+setErrorTest = TestLabel "setError" $ TestList
+    [ TestCase $ assertEqual "success" (Right 1) $ parse (setError "" pnext) [1..3]
+    , TestCase $ assertEqual "failure" (Left "a") $ parse (setError "a" pnext) []
+    ]
+
+functorTest :: Test
+functorTest = TestLabel "functor" $ TestList
+    [ TestCase $ assertEqual "success" (Right "1") $ parse (show <$> pnext) [1]
+    , TestCase $ assertEqual "failure" (Left 0) $ parse (show <$> failInt 0) []
+    ]
+
+bifunctorTest :: Test
+bifunctorTest = TestLabel "bifunctor" $ TestList
+    [ TestCase $ assertEqual "success" (Right "1") $ parse (bimap id show pnext) [1]
+    , TestCase $ assertEqual "failure" (Left "0") $ parse (bimap show id $ failInt 0) []
+    ]
+
+applicativeTest :: Test
+applicativeTest = TestLabel "applicative" $ TestList
+    [ TestCase $ assertEqual "pure" (Right (0, [1])) $ run (pureInt 0) [1]
+    , TestCase $ assertEqual "apply" (Right (3, [3])) $ run ((+) <$> pnext <*> pnext) [1..3]
     ]
   where
-    testInt :: Int -> Test
-    testInt i = testSuccess ("match " <> show i) i $ parse pint [show i]
+    pureInt :: Int -> Parser [Int] String Int
+    pureInt = pure
 
-pstrTest :: Test
-pstrTest = TestLabel "pstr" (TestList
-    [ testSuccess "match" "abc" $ parse (pstr "abc") ["abc"]
-    , testFailure "no match" $ parse (pstr "bc") ["abc"]
-    , testFailure "part match" $ parse (pstr "acb") ["abc"]
-    ])
+monadTest :: Test
+monadTest = TestCase $ assertEqual "monad" (Right (3, [3])) $ run (pnext >>= \i -> (+i) <$> pnext) [1..3]
 
-pquotedstrTest :: Test
-pquotedstrTest = TestLabel "pquotedstring" (TestList
-    [ testSuccess "success" "value" $ parse pquotedstr ["\"value\""]
-    , testFailure "no open quote" $ parse pquotedstr ["value\""]
-    , testFailure "no close quote" $ parse pquotedstr ["\"value"]
-    ])
+pendTest :: Test
+pendTest = TestLabel "pend" $ TestList
+    [ TestCase $ assertEqual "end" (Right ()) $ parse pend []
+    , TestCase $ assertEqual "not end" (Left ExpectedEndOfInput) $ parse pend [1]
+    ]
 
-withErrorTest :: Test
-withErrorTest = TestLabel "withError" (TestList
-    [ testSuccess "success unchanged" 'a' $ parse (pchar 'a' <?> "my error") ["abc"]
-    , TestCase $ assertEqual "failure <?> msg" (Left "my error") $ first message (parse (pchar 'a' <?> "my error") [""])
-    , TestCase $ assertEqual "withError msg failure" (Left "my error") $ first message (parse (withError "my error" $ pchar 'a') [""])
-    ])
-
-altTest :: Test
-altTest = TestLabel "<|>" (TestList
-    [ testSuccess "Right <|> Left" 'a' $ parse (pchar 'a' <|> pchar 'b') ["abc"]
-    , testSuccess "Left <|> Right" 'b' $ parse (pchar 'a' <|> pchar 'b') ["bc"]
-    , testFailure "Left <|> Left" $ parse (pchar 'a' <|> pchar 'b') ["c"]
-    ])
-
-combinerTest :: Test
-combinerTest = TestLabel "combiners" (TestList [tuples, ignores])
-  where
-    tuples :: Test
-    tuples = TestList
-        [ testSuccess "Right .&&. Right" ('a','b') $ parse (pchar 'a' .&&. pchar 'b') ["abc"]
-        , testFailure "Left .&&. Right" $ parse (pchar 'a' .&&. pchar 'b') ["bab"]
-        , testFailure "Right .&&. Left" $ parse (pchar 'a' .&&. pchar 'b') ["acb"]
-        ]
-    ignores :: Test
-    ignores = TestList
-        [ testSuccess "a &&. b" 'b' $ parse (pchar 'a' &&. pchar 'b') ["abc"]
-        , testSuccess "a .&& b" 'a' $ parse (pchar 'a' .&& pchar 'b') ["abc"]
-        , testFailure "! &&. b" $ parse (pchar 'b' &&. pchar 'a') ["abc"]
-        , testFailure "a .&& !" $ parse (pchar 'a' .&& pchar 'c') ["abc"]
-        ]
-
-pfilterTest :: Test
-pfilterTest = TestLabel "pfilter" (TestList
-    [ testSuccess "true" 'a' $ parseString (pfilter (== 'a') $ pchar 'a') "abc"
-    , testSuccess "false or true" 'a' $ parseString (pfilter (== 'b') (pchar 'a') <|> pchar 'a') "abc" 
-    , testFailure "pfilter false" $ parseString (pfilter (== 'b') $ pchar 'a') "abc"
-    , testFailure "pfilter fail" $ parseString (pfilter (== 'a') $ pchar 'b') "abc"
-    ])
-
-optionTest :: Test
-optionTest = TestLabel "option" (TestList
-    [ testSuccess "match" (Just 'a') $ parseString (option $ pchar 'a') "abc"
-    , testSuccess "no match" Nothing $ parseString (option $ pchar 'b') "abc"
-    ])
-
-oneOrMoreTest :: Test
-oneOrMoreTest = TestLabel "oneOrMore" (TestList
-    [ testFailure "empty" $ parseString (oneOrMore $ pchar 'a') ""
-    , testFailure "none" $ parseString (oneOrMore $ pchar 'b') "abc"
-    , testSuccess "one" "a" $ parseString (oneOrMore $ pchar 'a') "abc"
-    , testSuccess "more" "aaa" $ parseString (oneOrMore $ pchar 'a') "aaabc"
-    ])
-
-zeroOrMoreTest :: Test
-zeroOrMoreTest = TestLabel "zeroOrMore" (TestList
-    [ testSuccess "empty" [] $ parseString (zeroOrMore $ pchar 'a') ""
-    , testSuccess "none" [] $ parseString (zeroOrMore $ pchar 'b') "abc"
-    , testSuccess "one" "a" $ parseString (zeroOrMore $ pchar 'a') "abc"
-    , testSuccess "more" "aaa" $ parseString (zeroOrMore $ pchar 'a') "aaabc"
-    ])
+orElseTest :: Test
+orElseTest = TestLabel "orElse" $ TestList
+    [ TestCase $ assertEqual "first" (Right 1) $ parse (pnext <||> pequal 0) [1]
+    , TestCase $ assertEqual "second" (Right 1) $ parse (pequal 0 <||> pnext) [1]
+    , TestCase $ assertEqual "both" (Right 1) $ parse (pequal 1 <||> ((+1) <$> pnext)) [1]
+    , TestCase $ assertEqual "neither" (Left "error 1") $ parse (failInt "error 1" <||> failInt "error 2") []
+    ]
 
 anyOfTest :: Test
-anyOfTest = TestLabel "anyOf" (TestList
-    [ testSuccess "match" 'a' $ parseString (anyOf [pchar 'c', pchar 'b', pchar 'a']) "abc"
-    , testFailure "no match" $ parseString (anyOf [pchar 'b', pchar 'c']) "abc"
-    , testFailure "empty parsers" $ parseString (anyOf []) "abc"
-    ])
+anyOfTest = TestLabel "anyOf" $ TestList
+    [ TestCase $ assertEqual "default" (Left "error") $ parse (anyOfInt "error" []) []
+    , TestCase $ assertEqual "first" (Right ()) $ parse (anyOf "error" [punit, failure "another error"]) [1]
+    , TestCase $ assertEqual "second" (Right ()) $ parse (anyOf "error" [failure "another error", punit]) [1]
+    , TestCase $ assertEqual "all" (Right 1) $ parse (anyOf "error" [pequal 1, (+1) <$> pnext]) [1]
+    , TestCase $ assertEqual "none" (Left "error 1") $ parse (anyOf "error 1" [failInt "error 2", failInt "error 3"]) []
+    ]
+  where
+    anyOfInt :: e -> [Parser [Int] e Int] -> Parser [Int] e Int
+    anyOfInt = anyOf
 
-whitespaceTest :: Test
-whitespaceTest = TestLabel "whitespace" (TestList
-    [ testSuccess "space" ' ' $ parseString whitespace " "
-    , testSuccess "tab" '\t' $ parseString whitespace "\t"
-    , testSuccess "carriage return" '\r' $ parseString whitespace "\r"
-    , testSuccess "new line" '\n' $ parseString whitespace "\n"
-    , testSuccess "new lines" '\n' $ parse whitespace [""]
-    , testSuccess "multiple new lines" ('\n','\n') $ parse (whitespace .&&. whitespace) ["", ""]
-    , testFailure "empty" $ parse whitespace []
-    , testFailure "non whitespace" $ parse whitespace ["a"]
-    ])
-
-eolTest :: Test
-eolTest = TestLabel "eol" $ TestList
-    [ testSuccess "empty string" () $ parse eol [""]
-    , testSuccess "newline" () $ parseString eol "\n"
-    , testSuccess "carriage return" () $ parseString eol "\r"
-    , testSuccess "cr/nl" () $ parseString eol "\r\n"
-    , testFailure "empty" $ parse eol []
-    , testFailure "non eol" $ parse eol ["a"]
+anyOfNETest :: Test
+anyOfNETest = TestLabel "anyOfNE" $ TestList
+    [ TestCase $ assertEqual "first" (Right ()) $ parse (anyOfNE $ punit :| [failure "error"]) [1]
+    , TestCase $ assertEqual "second" (Right ()) $ parse (anyOfNE $ failure "error" :| [punit]) [1]
+    , TestCase $ assertEqual "none" (Left "error 1") $ parse (anyOfNE $ failInt "error 1" :| [failInt "error 2"]) [1]
     ]
 
-eofTest :: Test
-eofTest = TestLabel "eof" (TestList
-    [ testSuccess "empty" () $ parseString eof ""
-    , testSuccess "empty source" () $ parse eof []
-    , testSuccess "empty string" () $ parse eof [""]
-    , testFailure "non-empty" $ parse eof ["a"]
-    ])
+optionTest :: Test
+optionTest = TestLabel "option" $ TestList
+    [ TestCase $ assertEqual "match" (Right $ Just 1) $ parse (option pnext) [1]
+    , TestCase $ assertEqual "no match" (Right Nothing) $ parse (option pnext) []
+    ]
+
+oneOrMoreTest :: Test
+oneOrMoreTest = TestLabel "oneOrMore" $ TestList
+    [ TestCase $ assertEqual "none" (Left MatchFailure) $ parse (oneOrMore $ pequal 0) [1]
+    , TestCase $ assertEqual "one" (Right [1]) $ parse (oneOrMore pnext) [1]
+    , TestCase $ assertEqual "more" (Right [1,2,3]) $ parse (oneOrMore pnext) [1..3]
+    ]
+
+zeroOrMoreTest :: Test
+zeroOrMoreTest = TestLabel "zeroOrMore" $ TestList
+    [ TestCase $ assertEqual "none" (Right []) $ parse (zeroOrMore $ pequal 0) [1]
+    , TestCase $ assertEqual "one" (Right [1]) $ parse (zeroOrMore pnext) [1]
+    , TestCase $ assertEqual "more" (Right [1,2,3]) $ parse (zeroOrMore pnext) [1..3]
+    ]

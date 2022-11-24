@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.35.0.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 0ae0d81b76111bfdfc8ef819464e0e21c36fde35e5d5c6c32d26d3acee78b39e
+-- hash: 419b454890493b0bf34b99ee41740ae81301308ef030372200c8050afbf3321f
 
 name:           haskell-parser
 version:        0.1.0.0
@@ -33,6 +33,7 @@ library
       Parsing.Parser
       Parsing.ParseState
       Parsing.Position
+      Parsing.StringParser
   other-modules:
       Paths_haskell_parser
   hs-source-dirs:
@@ -49,15 +50,17 @@ test-suite haskell-parser-test
       Parsing.ParseErrorTest
       Parsing.ParserTest
       Parsing.PositionTest
+      Parsing.StringParserCheck
       Paths_haskell_parser
   hs-source-dirs:
       test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       HUnit
+    , QuickCheck
     , base >=4.7 && <5
     , haskell-parser
-    , regex-pcre
+    , regex-pcre-builtin
     , test-framework
     , test-framework-hunit
   default-language: Haskell2010
